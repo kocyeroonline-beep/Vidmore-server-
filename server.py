@@ -1,61 +1,57 @@
-from flask import Flask, request, jsonify, send_file
-from flask_cors import CORS
+from flask import Flask, request, jsonify
 from pytube import YouTube, Search
 import os
 
 app = Flask(__name__)
-CORS(app)  # 🔑 kugirango app ya Kivy ibone data
 
-@app.route("/")
-def home():
-    return {"message": "Vidmore API Running ✅"}
+@app.route("/trending", methods=["GET"])
+def trending():
+    # Placeholder - YouTube API yifashishwa neza, aha turakoresha fake
+    results = [
+        {"title": "Trending Song", "channel": "Music Channel", "time": "2h ago",
+         "url": "https://youtu.be/dQw4w9WgXcQ", "thumbnail": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"},
+        {"title": "Funny Shorts", "channel": "Comedy Hub", "time": "1d ago",
+         "url": "https://youtu.be/dQw4w9WgXcQ", "thumbnail": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"}
+    ]
+    return jsonify(results)
 
-@app.route("/search")
+@app.route("/search", methods=["GET"])
 def search():
     query = request.args.get("q")
-    if not query:
-        return jsonify([])
     s = Search(query)
     results = []
-    for video in s.results[:10]:  # 10 za mbere
+    for v in s.results[:10]:
         results.append({
-            "title": video.title,
-            "url": video.watch_url,
-            "thumbnail": f"https://img.youtube.com/vi/{video.video_id}/0.jpg"
+            "title": v.title,
+            "channel": v.author,
+            "time": "N/A",
+            "url": v.watch_url,
+            "thumbnail": v.thumbnail_url
         })
     return jsonify(results)
 
-@app.route("/info")
+@app.route("/info", methods=["GET"])
 def info():
     url = request.args.get("url")
-    if not url:
-        return jsonify([])
     yt = YouTube(url)
     streams = []
-    for s in yt.streams.filter(progressive=True, file_extension="mp4"):
+    for s in yt.streams.filter(progressive=True):
         streams.append({
             "itag": s.itag,
+            "type": "video" if s.resolution else "audio",
             "resolution": s.resolution,
-            "type": "video",
-            "filesize": s.filesize
+            "abr": s.abr
         })
-    for s in yt.streams.filter(only_audio=True):
-        streams.append({
-            "itag": s.itag,
-            "abr": s.abr,
-            "type": "audio",
-            "filesize": s.filesize
-        })
-    return jsonify(streams)
+    return jsonify({"title": yt.title, "streams": streams})
 
-@app.route("/download")
+@app.route("/download", methods=["GET"])
 def download():
     url = request.args.get("url")
     itag = request.args.get("itag")
     yt = YouTube(url)
-    stream = yt.streams.get_by_itag(itag)
-    out_file = stream.download(output_path="downloads")
-    return send_file(out_file, as_attachment=True)
+    stream = yt.streams.get_by_itag(int(itag))
+    file_path = stream.download(output_path="downloads")
+    return jsonify({"status": "ok", "file": file_path})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000)
